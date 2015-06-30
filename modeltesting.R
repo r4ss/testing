@@ -12,6 +12,8 @@ copyinputs <-
            use_ss_new=FALSE,
            copy_sso=FALSE)
 {
+  ### create new directories and copy SS input files to them
+
   # source the SS_readstarter function
   source("http://r4ss.googlecode.com/svn/trunk/SS_readstarter.R")
   if(!file.exists(newdir)) dir.create(newdir)
@@ -106,6 +108,7 @@ copyexe <-
            folderlist=c("Example_1","Example_2"),
            exe="SS3_safe.exe", overwrite=FALSE)
 {
+  # copy new exe file into new directories
   fullexe <- paste(sourcedir,exe,sep="/")
   if(!file.exists(fullexe)) stop("file missing:",fullexe)
   for(i in 1:length(folderlist)){
@@ -123,6 +126,7 @@ runmodels <-
            extras="-nox -gbs 100000000 -cbs 100000000",
            intern=FALSE)
 {
+  # run the executables in each directory
   for(i in 1:length(folderlist)){
     new <- paste(newdir,folderlist[i],sep="/")
     cat("running model in",new,"\n")
@@ -141,6 +145,7 @@ addtotable <- function(dir="\\\\nwcfs2\\assessment\\FramPublic\\StockSynthesisSt
                        oldtable="summarytable.csv",
                        newtable="newsummarytable.csv")
 {
+  # read output from model runs and add to table of results
   cat("reading",paste(dir,oldtable,sep="\\"),"\n")
   summarytable <- read.csv(paste(dir,oldtable,sep="\\"))
 
