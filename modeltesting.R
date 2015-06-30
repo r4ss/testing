@@ -1,4 +1,10 @@
 # a collection of functions for testing a new SS executable
+#
+# functions include:
+#   copyinputs    # create new directories and copy SS input files to them
+#   copyexe       # copy new exe file into new directories
+#   runmodels     # run the executables in each directory
+#   addtotable    # read output from model runs and add to table of results
 
 copyinputs <-
   function(olddir="c:/SS/Version_A",
@@ -18,7 +24,7 @@ copyinputs <-
     foldername <- stuff[i]
     oldsubfolder <- paste(olddir,foldername,sep="/")
     # check if it's a directory
-    info <- file.info(oldsubfolder) 
+    info <- file.info(oldsubfolder)
 
     if(info$isdir){ # if it's a directory, then do stuff
       cat("checking",oldsubfolder,"\n")
@@ -29,7 +35,7 @@ copyinputs <-
 
       if(length(starterfile)==1){
         folderlist <- c(folderlist,foldername) # keep a record of folders with model files inside
-        
+
         if(use_ss_new){ # if requested, use the .ss_new files as sources
           starterfile <- dir(oldsubfolder)[grep("^starter.ss_new$",tolower(dir(oldsubfolder)))]
           forecastfile <- dir(oldsubfolder)[grep("^forecast.ss_new$",tolower(dir(oldsubfolder)))]
@@ -39,7 +45,7 @@ copyinputs <-
         newstarterfile <- "starter.ss"
         newforecastfile <- "forecast.ss"
         newwtatagefile <- "wtatage.ss"
-          
+
         # read starter file using SS_readstarter function
         cat("reading starter file:",starterfile,"\n")
         startercontents <- SS_readstarter(paste(oldsubfolder,starterfile,sep="/"))
@@ -55,7 +61,7 @@ copyinputs <-
           datfile <- "BootData.ss"
           ctlfile <- "control.ss_new"
         }
-        
+
         # create new directory within newdir
         newsubfolder <- paste(newdir,foldername,sep="/")
         cat("creating new directory:",newsubfolder,"\n")
@@ -84,7 +90,7 @@ copyinputs <-
           for(ifile in 1:length(old_sso_list)){
             copyfile(filename1=old_sso_list[ifile],
                      filename2=old_sso_list[ifile])
-          }          
+          }
         }
       }else{ # if check for starter file fails
         cat("  !no starter.ss file in this directory\n")
@@ -101,7 +107,7 @@ copyexe <-
            exe="SS3_safe.exe", overwrite=FALSE)
 {
   fullexe <- paste(sourcedir,exe,sep="/")
-  if(!file.exists(fullexe)) stop("file missing:",fullexe) 
+  if(!file.exists(fullexe)) stop("file missing:",fullexe)
   for(i in 1:length(folderlist)){
     new <- paste(newdir,folderlist[i],exe,sep="/")
     x <- file.copy(fullexe, new, overwrite=overwrite)
@@ -144,7 +150,7 @@ addtotable <- function(dir="\\\\nwcfs2\\assessment\\FramPublic\\StockSynthesisSt
   nquants <- length(unique(Quant))
 
   alloutputs <- list()
-  
+
   for(iversion in 1:length(SSversions)){ # loop over versions of SS
     newcolumn <- rep(NA,nrow(summarytable))
 
@@ -160,7 +166,7 @@ addtotable <- function(dir="\\\\nwcfs2\\assessment\\FramPublic\\StockSynthesisSt
       foldername <- stuff[i]
       subfolder <- paste(versionfolder,foldername,sep="/")
       # check if it's a directory
-      info <- file.info(subfolder) 
+      info <- file.info(subfolder)
 
       if(info$isdir){ # if it's a directory, then do stuff
         cat("checking",subfolder,"\n")
@@ -172,8 +178,8 @@ addtotable <- function(dir="\\\\nwcfs2\\assessment\\FramPublic\\StockSynthesisSt
     }
     cat("\nGood folders are:",paste(folderlist,collapse="\n                 "),"\n")
     cat("Getting output from those folders...\n\n")
-    
-    nmodels <- length(folderlist)    
+
+    nmodels <- length(folderlist)
     longfolderlist <- paste(versionfolder,folderlist,sep="\\")
 
     newoutput <- SSgetoutput(keyvec = NULL, dirvec = longfolderlist,
@@ -182,7 +188,7 @@ addtotable <- function(dir="\\\\nwcfs2\\assessment\\FramPublic\\StockSynthesisSt
     names(newoutput) <- folderlist
 
     alloutputs[[SSversions[iversion]]] <- newoutput
-    
+
     for(imodel in 1:nmodels){    # loop over test models within that version
 
       newreplist <- newoutput[[imodel]]
@@ -212,7 +218,7 @@ addtotable <- function(dir="\\\\nwcfs2\\assessment\\FramPublic\\StockSynthesisSt
     names(summarytable)[names(summarytable)=="newcolumn"] <- SSversions[iversion]
   }
 
-  
+
   cat("writing",paste(dir,newtable,sep="\\"),"\n")
   write.csv(summarytable,paste(dir,newtable,sep="\\"),row.names=FALSE)
 
@@ -255,7 +261,7 @@ extrastuff <- function(){
     cat("\nabsolute differences greater than 1e-3  for model",i,":", folderinfo$folderlist[i],"\n" )
     if(nrow(abstable)>1) print(abstable) else print("none!")
     cat("relative differences greater than 1e-3 for model",i,":", folderinfo$folderlist[i],"\n" )
-    if(nrow(reltable)>1) print(reltable) else print("none!")      
+    if(nrow(reltable)>1) print(reltable) else print("none!")
   }
 
   quantities <- c("TotalNLL", "EndingDepl", "LogR0", "LogR0_SD",
@@ -289,18 +295,18 @@ if(FALSE){
   source('c:/GitHub/testing/modeltesting.R')
 
   # make directories and copy input files from one folder to the next
-  folderinfo <- copyinputs(olddir="c:/SS/modeltesting/Version_3_30_Nov12",
-                           newdir="c:/SS/modeltesting/Version_3_30_Dec1")
+  folderinfo <- copyinputs(olddir="c:/SS/modeltesting/Version_3_24s_July24",
+                           newdir="c:/SS/modeltesting/Version_3_30_May22")
 
   # starting after making directories
   source('c:/GitHub/testing/modeltesting.R')
-  setwd("c:/SS/modeltesting/Version_3_30_June17")
+  setwd("c:/SS/modeltesting/Version_3_30_May22")
   folderinfo <- list(newdir=getwd(),
                      folderlist=dir())
   # on sysiphus
   folderinfo <- copyinputs(olddir="c:/SS/modeltesting/Version_3_20_Jan3",
                            newdir="y:/h_itaylor/SS/modeltesting/Version_3_20e_Mar15")
-  
+
   # make copy using .ss_new files as sources to use as example files
   folderinfo <- copyinputs(olddir="c:/SS/modeltesting/Version_3_21e_June9_examples",
                            newdir="c:/SS/modeltesting/Version_3_21e_June9_examples_clean",
@@ -309,7 +315,7 @@ if(FALSE){
                            newdir="c:/SS/modeltesting/Version_3_21e_June9_examples_test")
 
   # copy executables into subfolders where each new model will be run
-  copyexe(sourcedir="c:/SS/SSv3.30_Dec1",
+  copyexe(sourcedir="c:/SS/SSv3.30_May22",
           newdir=folderinfo$newdir,
           folderlist=folderinfo$folderlist,
           exe="ss3.exe")
@@ -335,7 +341,7 @@ if(FALSE){
   runmodels(newdir=folderinfo$newdir,
             folderlist=folderinfo$folderlist,exe="ss3.exe",extras="-noest -nohess -nox")
 
-  # run new SS executable for each example model 
+  # run new SS executable for each example model
   runmodels(newdir=folderinfo$newdir,
             folderlist=folderinfo$folderlist,exe="ss3.exe",extras="-nox")
 
@@ -350,7 +356,7 @@ if(FALSE){
   source("http://r4ss.googlecode.com/svn/branches/testing/modeltesting.R")
   mydir <- "~/h_itaylor/SS/modeltesting/Version_3_20_Jan3"
   runmodels(newdir=mydir, folderlist=dir(mydir),exe="./SS3",extras="-nox")
-  
+
   # get updated package files, including the SSgetoutput function
   devtools::install_github("r4ss/r4ss")
   library(r4ss)
@@ -378,22 +384,22 @@ if(FALSE){
     summarytable <- rbind(summarytable, newrows)
   }
   write.csv(summarytable,file="c:/SS/modeltesting/expanded_summarytable.csv")
-  
+
   # read the output from the new runs and add it to the summary table
   alloutput <-
-    addtotable(dir = "c:/SS/modeltesting/", 
-               #dir = "\\\\nwcfs2\\assessment\\FramPublic\\StockSynthesisStuff\\modeltesting\\", 
-               oldtable = "summarytable.csv", 
+    addtotable(dir = "c:/SS/modeltesting/",
+               #dir = "\\\\nwcfs2\\assessment\\FramPublic\\StockSynthesisStuff\\modeltesting\\",
+               oldtable = "summarytable.csv",
                newtable = "newsummarytable.csv",
-               SSversions=c("Version_3_30_Dec1"))
+               SSversions=c("Version_3_30_May22"))
 
   # example on sysiphus
   alloutput <-
-    addtotable(dir = "y:/h_itaylor/SS/modeltesting/", 
-               oldtable = "summarytable.csv", 
+    addtotable(dir = "y:/h_itaylor/SS/modeltesting/",
+               oldtable = "summarytable.csv",
                newtable = "newsummarytable.csv",
                SSversions=c("Version_3_20_Jan3"))
-  
+
   # making plots
   for(i in length(alloutput):1){
     models <- alloutput[[i]]
@@ -414,7 +420,7 @@ if(FALSE){
     print(testvec)
   }
 
-  
+
   # running on linux
   newdir <- "~/h_itaylor/SS/modeltesting/Version_3_11c_Oct30/"
   copyexe(sourcedir="~/h_itaylor/SS/SSv3.11c_Oct30",
