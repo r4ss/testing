@@ -10,12 +10,14 @@ copyinputs <-
   function(olddir="c:/SS/Version_A",
            newdir="c:/SS/Version_B",
            use_ss_new=FALSE,
+           splitdat=FALSE,
            copy_sso=FALSE)
 {
   ### create new directories and copy SS input files to them
 
   # source the SS_readstarter function
-  source("http://r4ss.googlecode.com/svn/trunk/SS_readstarter.R")
+  #source("http://r4ss.googlecode.com/svn/trunk/SS_readstarter.R")
+  require(r4ss)
   if(!file.exists(newdir)) dir.create(newdir)
 
   if(is.na(file.info(olddir)$isdir)) stop("not a directory:",olddir)
@@ -24,7 +26,7 @@ copyinputs <-
   for(i in 1:length(stuff)){ # loop over things within this directory
     # get full path of file
     foldername <- stuff[i]
-    oldsubfolder <- paste(olddir,foldername,sep="/")
+    oldsubfolder <- file.path(olddir, foldername)
     # check if it's a directory
     info <- file.info(oldsubfolder)
 
@@ -50,22 +52,27 @@ copyinputs <-
 
         # read starter file using SS_readstarter function
         cat("reading starter file:",starterfile,"\n")
-        startercontents <- SS_readstarter(paste(oldsubfolder,starterfile,sep="/"))
+        #browser()
+        startercontents <- SS_readstarter(file.path(oldsubfolder, starterfile))
         # get ctl and data file names from contents of starter file
         newdatfile <- datfile <- startercontents$datfile
         newctlfile <- ctlfile <- startercontents$ctlfile
 
         # if requested, have the source file names be based on the .ss_new files
         if(use_ss_new){
-          SS_splitdat(inpath=oldsubfolder,
-                      outpath=oldsubfolder,
-                      inputs=T,MLE=F)
-          datfile <- "BootData.ss"
+          if(splitdat){
+            SS_splitdat(inpath=oldsubfolder,
+                        outpath=oldsubfolder,
+                        inputs=T,MLE=F)
+            datfile <- "BootData.ss"
+          }else{
+            datfile <- "data.ss_new"
+          }
           ctlfile <- "control.ss_new"
         }
 
         # create new directory within newdir
-        newsubfolder <- paste(newdir,foldername,sep="/")
+        newsubfolder <- file.path(newdir, foldername)
         cat("creating new directory:",newsubfolder,"\n")
         dir.create(newsubfolder)
 
@@ -73,8 +80,8 @@ copyinputs <-
         copyfile <- function(filename1,filename2=NULL){
           # simple function to make repeated task more efficient
           if(is.null(filename2)) filename2 <- filename1
-          old <- paste(oldsubfolder,filename1,sep="/")
-          new <- paste(newsubfolder,filename2,sep="/")
+          old <- file.path(oldsubfolder,filename1)
+          new <- file.path(newsubfolder,filename2)
           x <- file.copy(old,new)
           if(x) cat("success copying") else cat("failure copying")
           cat("\n old:", old, "\n new:", new, "\n")
@@ -109,10 +116,10 @@ copyexe <-
            exe="SS3_safe.exe", overwrite=FALSE)
 {
   # copy new exe file into new directories
-  fullexe <- paste(sourcedir,exe,sep="/")
+  fullexe <- file.path(sourcedir, exe)
   if(!file.exists(fullexe)) stop("file missing:",fullexe)
   for(i in 1:length(folderlist)){
-    new <- paste(newdir,folderlist[i],exe,sep="/")
+    new <- file.path(newdir, folderlist[i], exe)
     x <- file.copy(fullexe, new, overwrite=overwrite)
     if(x) cat("success copying") else cat("failure copying")
     cat(" exe to:", new, "\n")
@@ -128,7 +135,7 @@ runmodels <-
 {
   # run the executables in each directory
   for(i in 1:length(folderlist)){
-    new <- paste(newdir,folderlist[i],sep="/")
+    new <- file.path(newdir, folderlist[i])
     cat("running model in",new,"\n")
     setwd(new)
     ADMBoutput <- system(paste(exe,extras),intern=intern)
@@ -169,7 +176,7 @@ addtotable <- function(dir="\\\\nwcfs2\\assessment\\FramPublic\\StockSynthesisSt
     for(i in 1:length(stuff)){ # loop over things within this directory
       # get full path of file
       foldername <- stuff[i]
-      subfolder <- paste(versionfolder,foldername,sep="/")
+      subfolder <- file.path(versionfolder, foldername)
       # check if it's a directory
       info <- file.info(subfolder)
 
@@ -208,11 +215,11 @@ addtotable <- function(dir="\\\\nwcfs2\\assessment\\FramPublic\\StockSynthesisSt
         newcolumn[Model==names(newoutput)[imodel] &
                   Quant=="LogR0_SD"] <- newreplist$parameters$Parm_StDev[newreplist$parameters$Label %in% c("SR_LN(R0)","SR_R0")]
         newcolumn[Model==names(newoutput)[imodel] &
-                  Quant=="B0_SD"] <- newreplist$derived_quants$StdDev[newreplist$derived_quants$LABEL=="SPB_Virgin"]
+                  Quant=="B0_SD"] <- newreplist$derived_quants$StdDev[newreplist$derived_quants$Label=="SPB_Virgin"]
         newcolumn[Model==names(newoutput)[imodel] &
-                  Quant=="ForeCatch_last"] <- tail(newreplist$derived_quants$Value[grep("ForeCatch_",newreplist$derived_quants$LABEL)],1)
+                  Quant=="ForeCatch_last"] <- tail(newreplist$derived_quants$Value[grep("ForeCatch_",newreplist$derived_quants$Label)],1)
         newcolumn[Model==names(newoutput)[imodel] &
-                  Quant=="ForeCatch_last_SD"] <- tail(newreplist$derived_quants$StdDev[grep("ForeCatch_",newreplist$derived_quants$LABEL)],1)
+                  Quant=="ForeCatch_last_SD"] <- tail(newreplist$derived_quants$StdDev[grep("ForeCatch_",newreplist$derived_quants$Label)],1)
         newcolumn[Model==names(newoutput)[imodel] &
                   Quant=="Nwarnings"] <- newreplist$Nwarnings
         newcolumn[Model==names(newoutput)[imodel] &
@@ -234,8 +241,8 @@ extrastuff <- function(){
 
   # a collection of additional commands that have not been generalized to work as well
   # might be improved upon in the future
-  oldfolders <- paste(folderinfo$olddir,folderinfo$folderlist,sep="/")
-  newfolders <- paste(folderinfo$newdir,folderinfo$folderlist,sep="/")
+  oldfolders <- file.path(folderinfo$olddir, folderinfo$folderlist)
+  newfolders <- file.path(folderinfo$newdir, folderinfo$folderlist)
 
   # get output from old model
   oldoutput <- SSgetoutput(keyvec = NULL, dirvec = oldfolders,
@@ -281,7 +288,7 @@ checkforreport <- function(dir="default", folderlist="default"){
     alldir <- dir(dir)
     folderlist <- NULL
     for(folder in alldir){
-      if(file.info(paste(dir,folder,sep='/'))$isdir)
+      if(file.info(file.path(dir, folder))$isdir)
         folderlist <- c(folderlist,folder)
     }
   }
@@ -289,7 +296,7 @@ checkforreport <- function(dir="default", folderlist="default"){
   n <- length(folderlist)
   sizes <- rep(-999,n)
   for(i in 1:n){
-    file <- paste(dir,folderlist[i],"Report.sso",sep="/")
+    file <- file.path(dir, folderlist[i], "Report.sso")
     sizes[i] <- file.info(file)$size
   }
   return(data.frame(model=folderlist,filesize=sizes))
@@ -299,13 +306,23 @@ if(FALSE){
   ## this stuff should be pasted directly into R instead of run as a function
   source('c:/GitHub/testing/modeltesting.R')
 
-  # make directories and copy input files from one folder to the next
-  folderinfo <- copyinputs(olddir="c:/SS/modeltesting/Version_3_24s_July24",
-                           newdir="c:/SS/modeltesting/Version_3_30_May22")
+  #### make directories and copy input files from one folder to the next
 
+  # use ss_trans
+  source('c:/GitHub/testing/modeltesting.R')
+  folderinfo <- copyinputs(olddir="c:/SS/modeltesting/Version_3_24s_July24",
+                           newdir="c:/SS/modeltesting/Version_3.30.08.02_trans")
+  # now run using converted files
+  source('c:/GitHub/testing/modeltesting.R')
+  folderinfo <- copyinputs(olddir="c:/SS/modeltesting/Version_3.30.08.02_trans",
+                           newdir="c:/SS/modeltesting/Version_3.30.08.02",
+                           use_ss_new=TRUE)
+  
+  
   # starting after making directories
   source('c:/GitHub/testing/modeltesting.R')
-  setwd("c:/SS/modeltesting/Version_3_30_May22")
+  setwd("c:/SS/modeltesting/Version_3.30.08.02_trans")
+  setwd("c:/SS/modeltesting/Version_3.30.08.02")
   folderinfo <- list(newdir=getwd(),
                      folderlist=dir())
   # on sysiphus
@@ -320,11 +337,16 @@ if(FALSE){
                            newdir="c:/SS/modeltesting/Version_3_21e_June9_examples_test")
 
   # copy executables into subfolders where each new model will be run
-  copyexe(sourcedir="c:/SS/SSv3.30_May22",
+  copyexe(sourcedir="C:/SS/SSv3.30.08.02_Sept26/Windows/",
           newdir=folderinfo$newdir,
           folderlist=folderinfo$folderlist,
-          exe="ss3.exe")
+          exe="ss_trans.exe")
 
+  copyexe(sourcedir="C:/SS/SSv3.30.08.02_Sept26/Windows/",
+          newdir=folderinfo$newdir,
+          folderlist=folderinfo$folderlist,
+          exe="ss.exe")
+  
   copyexe(sourcedir="y:/h_itaylor/SS/SSv3.20_Jan3",
           newdir=folderinfo$newdir,
           folderlist=folderinfo$folderlist,
@@ -344,15 +366,14 @@ if(FALSE){
 
   # run new SS executable for each example model without estimating anything
   runmodels(newdir=folderinfo$newdir,
-            folderlist=folderinfo$folderlist,exe="ss3.exe",extras="-noest -nohess -nox")
+            folderlist=folderinfo$folderlist,exe="ss_trans.exe",extras="-maxfn 0 -phase 20 -nohess -nox")
 
   # run new SS executable for each example model
   runmodels(newdir=folderinfo$newdir,
-            folderlist=folderinfo$folderlist,exe="ss3.exe",extras="-nox")
+            folderlist=folderinfo$folderlist,exe="ss.exe",extras="-nox")
 
   # alternatively, run models in all subfolders
   #   if the folderinfo object is not available
-  source("c:/SS/R/r4ss/branches/testing/modeltesting.R")
   mydir <- "c:/SS/modeltesting/Version_3_24b_May15"
   runmodels(newdir=mydir, folderlist=dir(mydir),exe="SS3.exe",extras="-nox")
   runmodels(newdir=mydir, folderlist=dir(mydir),exe="SS3.exe",extras="-noest -nohess -nox")
@@ -396,7 +417,7 @@ if(FALSE){
                #dir = "\\\\nwcfs2\\assessment\\FramPublic\\StockSynthesisStuff\\modeltesting\\",
                oldtable = "summarytable.csv",
                newtable = "newsummarytable.csv",
-               SSversions=c("Version_3_30_May22"))
+               SSversions=c("Version_3.30.08.02"))
 
   # example on sysiphus
   alloutput <-
