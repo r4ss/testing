@@ -1,151 +1,4 @@
-# a collection of functions for testing a new SS executable
-#
-# functions include:
-#   copyinputs    # create new directories and copy SS input files to them
-#   copyexe       # copy new exe file into new directories
-#   runmodels     # run the executables in each directory
-#   addtotable    # read output from model runs and add to table of results
-
-copyinputs <-
-  function(olddir="c:/SS/Version_A",
-           newdir="c:/SS/Version_B",
-           use_ss_new=FALSE,
-           splitdat=FALSE,
-           copy_sso=FALSE)
-{
-  ### create new directories and copy SS input files to them
-
-  # source the SS_readstarter function
-  #source("http://r4ss.googlecode.com/svn/trunk/SS_readstarter.R")
-  require(r4ss)
-  if(!file.exists(newdir)) dir.create(newdir)
-
-  if(is.na(file.info(olddir)$isdir)) stop("not a directory:",olddir)
-  folderlist <- NULL
-  stuff <- dir(olddir) # get list of subfolders within olddir
-  for(i in 1:length(stuff)){ # loop over things within this directory
-    # get full path of file
-    foldername <- stuff[i]
-    oldsubfolder <- file.path(olddir, foldername)
-    # check if it's a directory
-    info <- file.info(oldsubfolder)
-
-    if(info$isdir){ # if it's a directory, then do stuff
-      cat("checking",oldsubfolder,"\n")
-      # get starter and forecast, allowing for differences in capitalization
-      starterfile <- dir(oldsubfolder)[grep("^starter.ss$",tolower(dir(oldsubfolder)))]
-      forecastfile <- dir(oldsubfolder)[grep("^forecast.ss$",tolower(dir(oldsubfolder)))]
-      wtatagefile <- dir(oldsubfolder)[grep("^wtatage.ss$",tolower(dir(oldsubfolder)))]
-
-      if(length(starterfile)==1){
-        folderlist <- c(folderlist,foldername) # keep a record of folders with model files inside
-
-        if(use_ss_new){ # if requested, use the .ss_new files as sources
-          starterfile <- dir(oldsubfolder)[grep("^starter.ss_new$",tolower(dir(oldsubfolder)))]
-          forecastfile <- dir(oldsubfolder)[grep("^forecast.ss_new$",tolower(dir(oldsubfolder)))]
-          wtatagefile <- dir(oldsubfolder)[grep("^wtatage.ss_new$",tolower(dir(oldsubfolder)))]
-        }
-        # new file names (forcing lowercase for consistency and linux compatibility)
-        newstarterfile <- "starter.ss"
-        newforecastfile <- "forecast.ss"
-        newwtatagefile <- "wtatage.ss"
-
-        # read starter file using SS_readstarter function
-        cat("reading starter file:",starterfile,"\n")
-        #browser()
-        startercontents <- SS_readstarter(file.path(oldsubfolder, starterfile))
-        # get ctl and data file names from contents of starter file
-        newdatfile <- datfile <- startercontents$datfile
-        newctlfile <- ctlfile <- startercontents$ctlfile
-
-        # if requested, have the source file names be based on the .ss_new files
-        if(use_ss_new){
-          if(splitdat){
-            SS_splitdat(inpath=oldsubfolder,
-                        outpath=oldsubfolder,
-                        inputs=T,MLE=F)
-            datfile <- "BootData.ss"
-          }else{
-            datfile <- "data.ss_new"
-          }
-          ctlfile <- "control.ss_new"
-        }
-
-        # create new directory within newdir
-        newsubfolder <- file.path(newdir, foldername)
-        cat("creating new directory:",newsubfolder,"\n")
-        dir.create(newsubfolder)
-
-        # copy files to new directories
-        copyfile <- function(filename1,filename2=NULL){
-          # simple function to make repeated task more efficient
-          if(is.null(filename2)) filename2 <- filename1
-          old <- file.path(oldsubfolder,filename1)
-          new <- file.path(newsubfolder,filename2)
-          x <- file.copy(old,new)
-          if(x) cat("success copying") else cat("failure copying")
-          cat("\n old:", old, "\n new:", new, "\n")
-        }
-        oldfilelist <- c(starterfile,forecastfile,datfile,ctlfile,wtatagefile)
-        newfilelist <- c(newstarterfile,newforecastfile,newdatfile,newctlfile,newwtatagefile)
-        # loop over input files
-        for(ifile in 1:length(oldfilelist)){
-          copyfile(filename1=oldfilelist[ifile],
-                   filename2=newfilelist[ifile])
-        }
-        if(copy_sso){
-          old_sso_list <- dir(oldsubfolder)[grep(".sso",dir(oldsubfolder))]
-          # loop over output files
-          for(ifile in 1:length(old_sso_list)){
-            copyfile(filename1=old_sso_list[ifile],
-                     filename2=old_sso_list[ifile])
-          }
-        }
-      }else{ # if check for starter file fails
-        cat("  !no starter.ss file in this directory\n")
-      }# end check for starter file
-    } # end check if it's a directory
-  } # end loop over stuff within olddir
-  return(list(olddir=olddir, newdir=newdir, folderlist=folderlist))
-}
-
-copyexe <-
-  function(sourcedir="c:/dir_with_exe/",
-           newdir="c:/newmodel/",
-           folderlist=c("Example_1","Example_2"),
-           exe="SS3_safe.exe", overwrite=FALSE)
-{
-  # copy new exe file into new directories
-  fullexe <- file.path(sourcedir, exe)
-  if(!file.exists(fullexe)) stop("file missing:",fullexe)
-  for(i in 1:length(folderlist)){
-    new <- file.path(newdir, folderlist[i], exe)
-    x <- file.copy(fullexe, new, overwrite=overwrite)
-    if(x) cat("success copying") else cat("failure copying")
-    cat(" exe to:", new, "\n")
-  } # end loop over folders
-}
-
-runmodels <-
-  function(newdir="c:/newmodel/",
-           folderlist=c("Example_1","Example_2"),
-           exe="SS3_safe.exe",
-           extras="-nox -gbs 100000000 -cbs 100000000",
-           intern=FALSE)
-{
-  # run the executables in each directory
-  for(i in 1:length(folderlist)){
-    new <- file.path(newdir, folderlist[i])
-    cat("running model in",new,"\n")
-    setwd(new)
-    ADMBoutput <- system(paste(exe,extras),intern=intern)
-    if(intern){
-      writeLines(c("###","ADMB output",paste("key =",key),as.character(Sys.time()),
-                            "###"," ",ADMBoutput), con = 'ADMBoutput.txt')
-      cat("commandline stuff written to ADMBoutput.txt\n")
-    }
-  } # end loop over folders
-}
+# R script for testing a new SS executable
 
 addtotable <- function(dir="\\\\nwcfs2\\assessment\\FramPublic\\StockSynthesisStuff\\modeltesting\\",
                        SSversions=c("Version_X","Version_Y"),
@@ -215,7 +68,7 @@ addtotable <- function(dir="\\\\nwcfs2\\assessment\\FramPublic\\StockSynthesisSt
         newcolumn[Model==names(newoutput)[imodel] &
                   Quant=="LogR0_SD"] <- newreplist$parameters$Parm_StDev[newreplist$parameters$Label %in% c("SR_LN(R0)","SR_R0")]
         newcolumn[Model==names(newoutput)[imodel] &
-                  Quant=="B0_SD"] <- newreplist$derived_quants$StdDev[newreplist$derived_quants$Label=="SPB_Virgin"]
+                  Quant=="B0_SD"] <- newreplist$derived_quants$StdDev[newreplist$derived_quants$Label=="SSB_Virgin"]
         newcolumn[Model==names(newoutput)[imodel] &
                   Quant=="ForeCatch_last"] <- tail(newreplist$derived_quants$Value[grep("ForeCatch_",newreplist$derived_quants$Label)],1)
         newcolumn[Model==names(newoutput)[imodel] &
@@ -237,72 +90,59 @@ addtotable <- function(dir="\\\\nwcfs2\\assessment\\FramPublic\\StockSynthesisSt
   return(invisible(alloutputs))
 }
 
-extrastuff <- function(){
-
-  # a collection of additional commands that have not been generalized to work as well
-  # might be improved upon in the future
-  oldfolders <- file.path(folderinfo$olddir, folderinfo$folderlist)
-  newfolders <- file.path(folderinfo$newdir, folderinfo$folderlist)
-
-  # get output from old model
-  oldoutput <- SSgetoutput(keyvec = NULL, dirvec = oldfolders,
-                           getcovar = TRUE, getcomp = TRUE,
-                           forecast = FALSE, verbose = TRUE)
-
-  # get output from new model
-  newoutput <- SSgetoutput(keyvec = NULL, dirvec = newfolders,
-                           getcovar = TRUE, getcomp = TRUE,
-                           forecast = FALSE, verbose = TRUE)
-
-  names(oldoutput) <- folderinfo$folderlist
-  names(newoutput) <- folderinfo$folderlist
-
-
-  # compare all parameters
-  for(i in 1:length(oldoutput)){
-    oldreplist <- oldoutput[[i]]
-    newreplist <- newoutput[[i]]
-    labels <- newreplist$parameters$Label
-    oldpars <- oldreplist$parameters$Value
-    newpars <- newreplist$parameters$Value
-    diff <- (newpars - oldpars)
-    reldiff <- (newpars - oldpars)/oldpars
-    partable <- data.frame(labels, newpars, oldpars, diff, reldiff)
-    abstable <- partable[abs(partable$diff)>1e-3,]
-    reltable <- partable[!is.nan(partable$reldiff) & abs(partable$reldiff)>1e-3,]
-    cat("\nabsolute differences greater than 1e-3  for model",i,":", folderinfo$folderlist[i],"\n" )
-    if(nrow(abstable)>1) print(abstable) else print("none!")
-    cat("relative differences greater than 1e-3 for model",i,":", folderinfo$folderlist[i],"\n" )
-    if(nrow(reltable)>1) print(reltable) else print("none!")
-  }
-
-  quantities <- c("TotalNLL", "EndingDepl", "LogR0", "LogR0_SD",
-                  "B0_SD", "Nwarnings", "MaxGradient")
-  temptable <- expand.grid(quantities,folderinfo$folderlist)
-  summarytable <- data.frame(Model=temptable$Var2,Quantity=temptable$Var1)
-}
-
-checkforreport <- function(dir="default", folderlist="default"){
-  if(dir=="default") dir <- getwd()
-  if(folderlist=="default"){
-    alldir <- dir(dir)
-    folderlist <- NULL
-    for(folder in alldir){
-      if(file.info(file.path(dir, folder))$isdir)
-        folderlist <- c(folderlist,folder)
-    }
-  }
-  cat("info on Report.sso files in",dir,"\n")
-  n <- length(folderlist)
-  sizes <- rep(-999,n)
-  for(i in 1:n){
-    file <- file.path(dir, folderlist[i], "Report.sso")
-    sizes[i] <- file.info(file)$size
-  }
-  return(data.frame(model=folderlist,filesize=sizes))
-}
 
 if(FALSE){
+
+  # new approach using SSutils
+  library(SSutils)
+  outerdir.old <- 'c:/SS/modeltesting/Version_3.30.13.09_July1'
+  outerdir.new <- 'c:/SS/modeltesting/Version_3.30.14.00_July16'
+  dir.info <- populate_multiple_folders(
+      outerdir.old = outerdir.old,
+      outerdir.new = outerdir.new,
+      exe.dir = 'c:/SS/SSv3.30.14.00_July16', overwrite=FALSE)
+  
+  # run the models in each directory
+  run_SS_models(dirvec = dir(outerdir.new, full.names=TRUE))
+
+  # get output
+  mods.dir <- dir(outerdir.new, full.names=TRUE)
+  mods.out <- SSgetoutput(dirvec=mods.dir)
+  
+  # run plotting functions
+  for(imod in 1:length(mods.out)){
+    print(imod)
+    print(mods.dir[imod])
+    graphics.off()
+    #SS_plots(mods.out[[imod]])
+    SS_plots(mods.out[[imod]], printfolder = 'sexratio')
+  }
+  
+  # check for successful completion of plots
+  for(imod in 1:length(mods.dir)){
+    #print(imod)
+    print(mods.dir[imod])
+    print(file.info(file.path(mods.dir[imod], "plots/SS_output.html"))$size)
+  }
+
+
+  # read the output from the new runs and add it to the summary table
+  alloutput <-
+    addtotable(dir = "c:/SS/modeltesting/",
+               #dir = "\\\\nwcfs2\\assessment\\FramPublic\\StockSynthesisStuff\\modeltesting\\",
+               oldtable = "summarytable.csv",
+               newtable = "newsummarytable.csv",
+               SSversions=c("Version_3.30.14.00_July16"))
+
+  # end new approach
+
+
+
+  #########################################################
+  #### old stuff
+  #########################################################
+
+  
   ## this stuff should be pasted directly into R instead of run as a function
   source('c:/GitHub/testing/modeltesting.R')
 
@@ -317,12 +157,27 @@ if(FALSE){
   folderinfo <- copyinputs(olddir="c:/SS/modeltesting/Version_3.30.08.02_trans",
                            newdir="c:/SS/modeltesting/Version_3.30.08.02",
                            use_ss_new=TRUE)
-  
+  # now run using converted files
+  source('c:/GitHub/testing/modeltesting.R')
+  folderinfo <- copyinputs(olddir="c:/SS/modeltesting/Version_3.30.11.00_Mar29",
+                           newdir="c:/SS/modeltesting/Version_3.30.12.00_June22",
+                           use_ss_new=FALSE)
+
+  # testing new function
+  folderinfo <- populate_multiple_folders(
+      outerdir.old="c:/SS/modeltesting/Version_3.30.11.00_Mar29",
+      outerdir.new="c:/SS/modeltesting/Version_3.30.12.00_June22",
+      use_ss_new=FALSE,
+      exe.dir="c:/SS/SSv3.30.12_June22",
+      exe.file="ss.exe")
+
+    
   
   # starting after making directories
   source('c:/GitHub/testing/modeltesting.R')
-  setwd("c:/SS/modeltesting/Version_3.30.08.02_trans")
-  setwd("c:/SS/modeltesting/Version_3.30.08.02")
+  #setwd("c:/SS/modeltesting/Version_3.30.08.02_trans")
+  setwd("c:/SS/modeltesting/Version_3.30.08.03")
+  setwd("U:/SS/modeltesting/Version_3.30.08.03")
   folderinfo <- list(newdir=getwd(),
                      folderlist=dir())
   # on sysiphus
@@ -337,21 +192,16 @@ if(FALSE){
                            newdir="c:/SS/modeltesting/Version_3_21e_June9_examples_test")
 
   # copy executables into subfolders where each new model will be run
-  copyexe(sourcedir="C:/SS/SSv3.30.08.02_Sept26/Windows/",
+  copyexe(sourcedir="C:/SS/SSv3.30.10.00_Dec8/",
           newdir=folderinfo$newdir,
           folderlist=folderinfo$folderlist,
           exe="ss_trans.exe")
 
-  copyexe(sourcedir="C:/SS/SSv3.30.08.02_Sept26/Windows/",
+  copyexe(sourcedir="C:/SS/SSv3.30.10.00_Dec8/",
           newdir=folderinfo$newdir,
           folderlist=folderinfo$folderlist,
           exe="ss.exe")
   
-  copyexe(sourcedir="y:/h_itaylor/SS/SSv3.20_Jan3",
-          newdir=folderinfo$newdir,
-          folderlist=folderinfo$folderlist,
-          exe="SS3")
-
   ## # convert to SSv3.20
   ## setwd(folderinfo$newdir)
   ## for(i in 1:length(folderinfo$folderlist)){
@@ -399,7 +249,7 @@ if(FALSE){
   ## # get list of quantities for each model
   ## quants <- summarytable$Quantity[summarytable$Model==mods[1]]
   # potentially bigger list of models
-  mods.dir <- dir("c:/SS/modeltesting/Version_3_24s_July24")
+  mods.dir <- dir("c:/SS/modeltesting/Version_3.30.14.00_July16")
   mods.diff <- setdiff(mods.dir, mods)
   # rows for new model
   blankrows <- summarytable[summarytable$Model==mods[1],]
@@ -409,7 +259,8 @@ if(FALSE){
     newrows$Model <- mods.diff[i]
     summarytable <- rbind(summarytable, newrows)
   }
-  write.csv(summarytable,file="c:/SS/modeltesting/expanded_summarytable.csv")
+  write.csv(summarytable,file="c:/SS/modeltesting/expanded_summarytable.csv",
+            row.names=FALSE)
 
   # read the output from the new runs and add it to the summary table
   alloutput <-
@@ -417,7 +268,7 @@ if(FALSE){
                #dir = "\\\\nwcfs2\\assessment\\FramPublic\\StockSynthesisStuff\\modeltesting\\",
                oldtable = "summarytable.csv",
                newtable = "newsummarytable.csv",
-               SSversions=c("Version_3.30.08.02"))
+               SSversions=c("Version_3.30.14.00_July16"))
 
   # example on sysiphus
   alloutput <-
