@@ -12,7 +12,7 @@ library(r4ss)
 library(furrr) # parallelized versions of purrr functions.
 options(stringsAsFactors = FALSE)
 #https://github.com/r4ss/testing/blob/master/modeltesting.R
-source(file.path("code", "modeltesting.R"))
+source("modeltesting.R")
 
 # dynamic input to change -----------------------------------------------------
 #will want to change these each time the script runs.
